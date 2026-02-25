@@ -175,7 +175,8 @@ dispersions as it is strictly positive but favors low values.
     import numpy as np
     import emcee
     import arviz as az
-    from scipy.stats import uniform, halfcauchy
+    from scipy.stats import uniform, halfcauchy, norm
+    
     
     def log_prior(theta):
         a, b, sigma = theta
@@ -190,13 +191,13 @@ dispersions as it is strictly positive but favors low values.
         a, b, sigma = theta
         mu = a * x + b
     
-        return np.sum(-0.5 * np.square((mu - a * x - b) / sigma))
+        return norm.logpdf(y, loc=mu, scale=sigma).sum()
     
     def log_prob(theta, x, y):
         lp = log_prior(theta)
         if not np.isfinite(lp):
             return -np.inf
-        return lp + log_likelihood(theta, x, observed)
+        return lp + log_likelihood(theta, x, y)
     
     ndim = 3
     nwalkers = 32  # common choice, should be ~ 2*ndim (and usually much larger)
@@ -207,17 +208,20 @@ dispersions as it is strictly positive but favors low values.
     sigma0 = halfcauchy.rvs(loc=0, scale=1, size=nwalkers)
     p0 = np.column_stack([a0, b0, sigma0])
     
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_prob, args=(x, observed))
+    sampler = emcee.EnsembleSampler(
+        nwalkers, ndim, log_prob, 
+        args=(x, observed)
+    )
     
     # Burn-in (tune)
-    tune_steps = 1_000
+    tune_steps = 5_000
     state = sampler.run_mcmc(p0, tune_steps, progress=True)
     
     # Reset to drop burn-in samples
     sampler.reset()
     
     # Production (draws)
-    draw_steps = 1_000
+    draw_steps = 5_000
     sampler.run_mcmc(state, draw_steps, progress=True)
     
     idata = az.from_emcee(sampler, var_names=["a", "b", "sigma"])
