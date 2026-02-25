@@ -131,10 +131,10 @@ standard deviation $\sigma$. More formally, our observed data is $Y = (y_1,... y
 $\theta = (a,b,\sigma)$.
 
 Under our model, we predict the observed points with $y_i = a x_i + b + \epsilon_i$, 
-where $\epsilon_i \sim \mathcal{N}(0,\sigma)$, or $y_i \sim \mathcal{N}(a x_i + b,\sigma)$. The analytical log-likelihood of our model is thus :
+where $\epsilon_i \sim \mathcal{N}(0,\sigma)$, or $y_i \sim \mathcal{N}(a x_i + b,\sigma)$. The log-likelihood of our model is thus (up to an additive constant):
 
 $$
-\mathcal{L}(a,b,\sigma) = \log P(Y | \theta) = - \sum_{i=1}^N \frac{\left(y_i - (a x_i + b)\right)^2}{2\sigma^2} 
+\mathcal{L}(a,b,\sigma) = \log P(Y | \theta) = - \sum_{i=1}^N \frac{\left(y_i - (a x_i + b)\right)^2}{2\sigma^2} - N \log(\sigma)
 $$
 
 Once we have defined our likelihood, we can define our prior distribution. Let's stick with the following 
@@ -230,6 +230,30 @@ dispersions as it is strictly positive but favors low values.
 Once the sampling is done, I would recommend to use [`arviz`](https://python.arviz.org/en/stable/index.html) to inspect 
 the posterior distributions, the trace of the chains and the posterior predictive checks. For the data visualizations 
 and article-ready plots, I suggest [`ChainConsumer`](https://samreay.github.io/ChainConsumer/).
+
+```py title="Posterior predictive checks"
+#Extract the samples
+stacked = az.extract(idata_pymc)
+a_samples = np.array(stacked.a)
+b_samples = np.array(stacked.b)
+sigma_samples = np.array(stacked.sigma)
+
+#Make posterior predictive from samples
+x_test = np.linspace(-2, 2, 1_000)
+posterior_predictive = np.random.normal(
+    loc=a_samples[None,:]*x_test[:,None] + b_samples[None,:], 
+    scale=sigma_samples[None,:]
+)
+
+#Plot the results
+median = np.median(posterior_predictive, axis=1)
+lower, upper = np.percentile(posterior_predictive, (5, 95), axis=1)
+plt.plot(x_test, median, color='blue', label='posterior median');
+plt.fill_between(x_test, lower, upper, color='lightblue', label='posterior 5% - 95% percentiles')
+plt.plot(x, a_ref * x + b_ref, label="True model", color="red")
+plt.scatter(x, observed, color='black', marker="x", label="Observed", zorder=100)
+plt.legend();
+```
 
 ## References
 
